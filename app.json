@@ -40,6 +40,12 @@
       ],
       "@react-native-community/datetimepicker",
       "expo-image"
-    ]
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "3e88aab0-5b90-41ce-baed-ed2032a6667e"
+      }
+    },
+    "owner": "msc_tech"
   }
 }
