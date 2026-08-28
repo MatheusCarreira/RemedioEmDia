@@ -28,15 +28,11 @@ um banco SQLite local, os alarmes agendados pelo Android. Isso é o que faz o
 alarme tocar sem internet — e também significa que a lista de remédios dela não
 vive em lugar nenhum além do celular dela.
 
-**O aviso de estoque vai para o celular dela, não para o de quem cadastrou.**
-Ela é independente; o aplicativo existe para facilitar a vida dela com os
-remédios, não para alguém ficar de olho.
-
 **Nada de estatística de adesão.** Um aplicativo que dá nota para quem esquece
 um comprimido não está ajudando.
 
 **Nada de checagem de interação medicamentosa.** Isso é ato médico, depende de
-base licenciada, e errar aqui machuca de verdade.
+base licenciada.
 
 **Toque de 72px, texto grande, tema claro fixo.** O mínimo da WCAG (44px) não
 basta para mão que treme. Nenhum estado é comunicado só por cor.
