@@ -145,6 +145,37 @@ Ela instala por cima e **os dados dela ficam**. O número de versão sobe sozinh
 não há nada para lembrar de alterar antes. Isso só vale enquanto for a mesma
 conta do Expo, porque é o que garante a mesma chave de assinatura.
 
+**Commit não tem nada a ver com isso.** Você pode fazer trinta commits e mandar
+um APK só. O que decide é: mudou alguma coisa que ela precisa ter no celular?
+Então junte as mudanças e mande um. O trabalho aqui não é o build, que é um
+comando — é ela ter que baixar e instalar de novo.
+
+### Existe um jeito de atualizar sem ela instalar nada
+
+Hoje o JavaScript vai dentro do APK, então qualquer mudança exige um APK novo. O
+`expo-updates` (versão `~57.0.18` para este SDK) mudaria isso: o aplicativo
+passaria a buscar a versão nova sozinho quando tivesse internet, e ela nunca mais
+instalaria nada à mão.
+
+Isso **não quebra o funcionamento offline**: sem rede, o aplicativo roda a última
+versão que já baixou, e o alarme continua no relógio do aparelho como sempre.
+
+O que a atualização pelo ar alcança:
+
+- muda pelo ar — telas, textos, regras de dose e de estoque, quase tudo que é
+  código deste repositório;
+- exige APK novo mesmo assim — permissão nova no `app.json`, ícone, nome do
+  pacote, qualquer biblioteca nativa nova, e subir de versão do Expo.
+
+**Recomendação: não no primeiro APK.** O primeiro build é justamente o que
+precisa ser confiado sem ressalva, e os três testes da etapa 7 nunca foram
+feitos. Misturar um mecanismo de atualização não testado com o build em que você
+está verificando o alarme atrapalha o diagnóstico: se algo se comportar mal, você
+não vai saber se foi o alarme ou o atualizador.
+
+Passando os três testes e o aplicativo assentando, aí vale acrescentar — de
+propósito, num segundo APK, sabendo que a base funciona.
+
 ---
 
 ## Se der errado
