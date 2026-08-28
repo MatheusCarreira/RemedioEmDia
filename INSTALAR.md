@@ -165,12 +165,3 @@ ferramenta instalada na máquina, então não deu para validar contra ela. Rodar
 `eas build:configure` conserta.
 
 ---
-
-## O que continua sem solução
-
-Não existe backup. Celular quebrado, perdido ou trocado apaga o cadastro, o
-histórico e o estoque. É consequência direta de não haver servidor — a mesma
-decisão que faz o alarme tocar sem internet.
-
-Dá para resolver sem servidor: exportar o banco num arquivo que ela compartilhe
-por WhatsApp ou Drive, e importar de volta num celular novo.
