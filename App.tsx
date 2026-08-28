@@ -1,9 +1,12 @@
+import * as Notifications from "expo-notifications";
 import type { SQLiteDatabase } from "expo-sqlite";
 import { StatusBar } from "expo-status-bar";
 import { useEffect, useState } from "react";
-import { StyleSheet, Text, View } from "react-native";
+import { Platform, StyleSheet, Text, View } from "react-native";
 import { SafeAreaProvider } from "react-native-safe-area-context";
+import { tratarResposta } from "./src/alarme/acoes";
 import { prepararAlarme } from "./src/alarme/alarme";
+import { registrarTarefaDeFundo } from "./src/alarme/tarefaDeFundo";
 import { abrirBanco } from "./src/dados/banco";
 import { FormularioRemedio } from "./src/telas/FormularioRemedio";
 import { Hoje } from "./src/telas/Hoje";
@@ -39,6 +42,11 @@ export default function App() {
   // só apareceria no dia seguinte.
   const [versaoDados, setVersaoDados] = useState(0);
 
+  // Sobe a cada botão de notificação atendido com o app aberto. Separado de
+  // `versaoDados` de propósito: aqui basta reler as doses, enquanto uma
+  // mudança de cadastro obriga a regerar o dia e remontar todos os alarmes.
+  const [respostasTratadas, setRespostasTratadas] = useState(0);
+
   useEffect(() => {
     (async () => {
       try {
@@ -47,6 +55,9 @@ export default function App() {
         // aparecer: se ela negar, o app continua servindo como lista — só
         // perde o alarme, que é o aviso mostrado abaixo.
         const autorizado = await prepararAlarme();
+        // Depois de `prepararAlarme`, que é quem registra a categoria: sem a
+        // categoria não existem botões, e sem botões a tarefa nunca acorda.
+        await registrarTarefaDeFundo();
         setSemPermissao(!autorizado);
         setBd(banco);
       } catch (e) {
@@ -54,6 +65,28 @@ export default function App() {
       }
     })();
   }, []);
+
+  /**
+   * O caminho do botão da notificação COM o app vivo.
+   *
+   * O outro caminho, com o app morto, é a tarefa de fundo — e os dois chamam a
+   * mesma `tratarResposta`, que aguenta ser chamada duas vezes para o mesmo
+   * toque. Isso acontece de verdade: o expo-notifications guarda a resposta
+   * numa fila quando não há ouvinte e a entrega quando o app abre.
+   */
+  useEffect(() => {
+    if (!bd || Platform.OS === "web") return;
+
+    const sub = Notifications.addNotificationResponseReceivedListener(
+      (resposta) => {
+        void (async () => {
+          const mudou = await tratarResposta(bd, resposta, new Date());
+          if (mudou) setRespostasTratadas((n) => n + 1);
+        })();
+      },
+    );
+    return () => sub.remove();
+  }, [bd]);
 
   if (erro) {
     return (
@@ -96,6 +129,7 @@ export default function App() {
         <Hoje
           bd={bd}
           versao={versaoDados}
+          sinal={respostasTratadas}
           aoAbrirRemedios={() => setTela({ nome: "remedios" })}
         />
       ) : tela.nome === "remedios" ? (

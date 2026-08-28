@@ -515,16 +515,15 @@ export async function salvarRemedio(
       );
     }
 
-    // Limpa as doses pendentes de hoje: os horários podem ter mudado.
-    const inicio = instanteDoDia(hoje, 0).toISOString();
-    const fim = instanteDoDia(hoje, 1439).toISOString();
+    // Limpa as doses pendentes de hoje em diante: os horários podem ter mudado.
+    // "em diante", e não só hoje, porque o planejamento das repetições já
+    // materializa as doses de amanhã — deixá-las para trás recriaria o remédio
+    // fantasma um dia depois, onde seria ainda mais difícil de entender.
     await bd.runAsync(
       `DELETE FROM doses
-        WHERE remedio_id = ? AND status = 'PENDENTE'
-          AND previsto_para BETWEEN ? AND ?`,
+        WHERE remedio_id = ? AND status = 'PENDENTE' AND previsto_para >= ?`,
       id,
-      inicio,
-      fim,
+      instanteDoDia(hoje, 0).toISOString(),
     );
   });
 
@@ -546,11 +545,22 @@ export async function apagarRemedio(
   await bd.runAsync(`DELETE FROM remedios WHERE id = ?`, id);
 }
 
-/** Liga/desliga sem perder histórico. */
+/**
+ * Liga/desliga sem perder histórico.
+ *
+ * Ao desligar, as doses pendentes de AMANHÃ em diante são apagadas. Elas
+ * existem porque o planejamento das repetições materializa as doses do dia
+ * seguinte com antecedência; sem esta limpeza, um remédio que ela acabou de
+ * parar de tomar reapareceria na tela amanhã de manhã.
+ *
+ * As de hoje ficam. Já estão na tela e podem até já ter tocado — tirá-las no
+ * meio do dia faria a lista mudar debaixo dela.
+ */
 export async function definirAtivo(
   bd: SQLiteDatabase,
   id: number,
   ativo: boolean,
+  hoje: Date = new Date(),
 ): Promise<void> {
   await bd.runAsync(
     `UPDATE remedios SET ativo = ?, atualizado_em = ? WHERE id = ?`,
@@ -558,4 +568,13 @@ export async function definirAtivo(
     agoraISO(),
     id,
   );
+
+  if (!ativo) {
+    await bd.runAsync(
+      `DELETE FROM doses
+        WHERE remedio_id = ? AND status = 'PENDENTE' AND previsto_para > ?`,
+      id,
+      instanteDoDia(hoje, 1439).toISOString(),
+    );
+  }
 }

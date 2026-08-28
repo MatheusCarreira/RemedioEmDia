@@ -12,12 +12,12 @@ import {
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { tomarDose } from "../alarme/acoes";
 import { reconciliarAlarmes } from "../alarme/reconciliar";
 import { marcarExemploInicial, semearExemploSeVazio } from "../dados/exemplo";
 import {
   dosesDeHoje,
   gerarDosesDoDia,
-  marcarTomada,
   remediosAcabando,
   reporCaixa,
 } from "../dados/remedios";
@@ -42,6 +42,7 @@ export function Hoje({
   bd,
   aoAbrirRemedios,
   versao,
+  sinal,
 }: {
   bd: SQLiteDatabase;
   aoAbrirRemedios: () => void;
@@ -51,6 +52,12 @@ export function Hoje({
    * remédio recém-cadastrado só apareceria no dia seguinte.
    */
   versao: number;
+  /**
+   * Muda quando um botão da notificação foi atendido com o app aberto. Só
+   * relê; não refaz o dia. Sem isso ela marcaria "já tomei" na notificação e
+   * veria a tela atrás continuar dizendo que falta tomar.
+   */
+  sinal: number;
 }) {
   const [carregando, setCarregando] = useState(true);
   const [agora, setAgora] = useState(() => new Date());
@@ -108,6 +115,13 @@ export function Hoje({
     };
   }, [recarregar]);
 
+  // Efeito separado, e não mais uma dependência do de cima: juntar os dois
+  // faria cada toque na notificação derrubar e recriar o relógio e o ouvinte
+  // de segundo plano, sem necessidade nenhuma.
+  useEffect(() => {
+    if (sinal > 0) void recarregar();
+  }, [sinal, recarregar]);
+
   async function aoTomar(id: string) {
     // Otimista: a tela responde no toque. Um botão que fica meio segundo sem
     // reagir faz ela apertar de novo — e o toque duplo é justamente o que a
@@ -115,7 +129,10 @@ export function Hoje({
     setDoses((atuais) =>
       atuais.map((d) => (d.id === id ? { ...d, tomadoEm: new Date() } : d)),
     );
-    await marcarTomada(bd, Number(id));
+    // `tomarDose` e não `marcarTomada`: marcar pela tela também precisa
+    // desmontar o lembrete de repetição, senão o app pergunta "você já tomou?"
+    // meia hora depois de ela ter respondido isso no botão grande.
+    await tomarDose(bd, Number(id));
     const [d, a] = await Promise.all([
       dosesDeHoje(bd, new Date()),
       remediosAcabando(bd),

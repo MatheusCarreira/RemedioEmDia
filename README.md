@@ -14,6 +14,11 @@ isso todo dia.
 - **Alarme na hora certa**, como notificação do Android, com o aplicativo
   fechado e **sem internet**. O horário é agendado no relógio do próprio
   aparelho.
+- **Botões dentro da notificação**: *JÁ TOMEI* e *LEMBRAR EM 15 MIN*, os dois
+  sem abrir o aplicativo. Marcar pela tela bloqueada desconta o estoque e
+  desmarca o lembrete, igualzinho a marcar pela tela.
+- **Um lembrete a mais, meia hora depois**, se ela não marcou. Uma vez só —
+  ver *Decisões* abaixo.
 - **Um cartão por dose**, com o nome do remédio, quantos comprimidos e a hora.
   Só a dose que está na hora ganha botão grande — as outras ficam quietas.
 - **Controle de estoque**: quantos comprimidos restam, quantos vêm na caixa, e
@@ -30,6 +35,22 @@ vive em lugar nenhum além do celular dela.
 
 **Nada de estatística de adesão.** Um aplicativo que dá nota para quem esquece
 um comprimido não está ajudando.
+
+**O lembrete de repetição acontece uma vez só.** Insistir até ela marcar
+transformaria o aplicativo num cobrador. E "não marcou" não é o mesmo que "não
+tomou" — o caso mais comum é ter tomado e esquecido de marcar. Insistir nesse
+caso ensina a ignorar a notificação, que é o único jeito de este aplicativo
+falhar de verdade. Se ela pedir *LEMBRAR EM 15 MIN*, o lembrete automático é
+cancelado: ela acabou de dizer quando quer ser avisada.
+
+**A repetição é preparada com dois dias de antecedência.** Diferente do alarme
+principal, que é um gatilho diário do Android e toca sozinho para sempre, a
+repetição precisa ser criada por alguém — ela só deve existir enquanto a dose
+não foi marcada. Quem cria é o aplicativo, ao abrir, e a tarefa de fundo, a cada
+botão de notificação atendido. Preparando dois dias por vez, um dia inteiro sem
+tocar em nada não desliga a repetição. Dois dias inteiros sem tocar em nada
+desligam: o alarme principal continua, a repetição para, e volta assim que ela
+abrir o aplicativo ou tocar um botão.
 
 **Nada de checagem de interação medicamentosa.** Isso é ato médico, depende de
 base licenciada.
@@ -82,10 +103,15 @@ src/
   dominio/    regras puras, sem React e sem banco
               doses.ts    -> os quatro estados de uma dose e os textos dela
               estoque.ts  -> a conta de quantos dias ainda dá
-  dados/      banco.ts    -> esquema SQLite e migrações (PRAGMA user_version)
+  dados/      esquema.ts  -> o SQL das tabelas e as migrações
+              banco.ts    -> abre a conexão e migra
               remedios.ts -> cadastro, doses do dia, marcar tomada, estoque
+              lembretes.ts-> repetição e adiamento (só banco)
               fotos.ts    -> câmera e galeria
-  alarme/     alarme.ts      -> agenda no Android
+  alarme/     alarme.ts      -> agenda no Android, e os botões da notificação
+              lembretes.ts   -> agenda repetição e adiamento
+              acoes.ts       -> o que um botão da notificação faz
+              tarefaDeFundo.ts -> atende o botão com o aplicativo fechado
               reconciliar.ts -> derruba tudo e reconstrói a agenda
   telas/      Hoje.tsx, MeusRemedios.tsx, FormularioRemedio.tsx
   ui/         tokens.ts e os componentes
@@ -99,12 +125,39 @@ agenda vive fora do banco de dados, dentro do Android, e pode ser descartada por
 uma atualização do sistema ou uma restauração de backup — reconstruir do zero é
 a única operação que chega no estado certo partindo de qualquer estado anterior.
 
+**Um toque no botão da notificação pode ser processado duas vezes.** Com o
+aplicativo fechado quem atende é a tarefa de fundo; com ele aberto, um ouvinte
+na tela. E o `expo-notifications` guarda a resposta numa fila quando não há
+ouvinte e a entrega quando o aplicativo abre — então o mesmo toque passa pelos
+dois caminhos. Isso não é defeito a corrigir, é característica a absorver: os
+dois chamam a mesma função, e tudo nela aguenta rodar duas vezes. Marcar uma
+dose já marcada não faz nada, e o desconto de estoque tem um `UNIQUE` no banco
+impedindo o segundo. O "lembrar em 15 min" compara o horário pedido com o que já
+está guardado: menos de um minuto de diferença é o mesmo toque, não um pedido
+novo.
+
+## Como conferir
+
+```bash
+npm run conferir
+```
+
+Roda o TypeScript e dois scripts: a conta de estoque e as migrações mais a
+regra dos lembretes. O segundo abre um SQLite na memória com o banco embutido
+do **Node** — é o mesmo SQLite do aparelho, e o que ele confere (SQL, restrições
+e contas de horário) não depende de qual dos dois está por baixo.
+
+O que esses scripts **não** conferem é a metade que fala com o Android: se a
+notificação toca, se o botão aparece, se a tarefa de fundo acorda com o
+aplicativo morto. Isso só existe no aparelho e só se sabe testando lá.
+
 ## O que ainda falta
 
-- Botões **"JÁ TOMEI"** e **"LEMBRAR EM 15 MIN"** dentro da própria notificação,
-  sem precisar abrir o aplicativo.
-- Repetir o lembrete se ela não marcar em ~30 minutos.
 - Gerar o APK e instalar no celular dela.
+- Testar os botões da notificação **com o aplicativo fechado**. Isso não dá para
+  fazer no Expo Go de forma confiável: com o aplicativo morto, o Android sobe o
+  JavaScript sozinho para atender o botão, e no Expo Go esse pacote vem pela
+  rede, do servidor de desenvolvimento. Precisa ser um build de verdade.
 
 **Risco conhecido e ainda sem solução:** não existe backup. Celular quebrado ou
 perdido apaga o cadastro, o histórico e o estoque.

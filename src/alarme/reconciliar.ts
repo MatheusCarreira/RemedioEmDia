@@ -1,6 +1,8 @@
 import type { SQLiteDatabase } from "expo-sqlite";
+import { planejarRepeticoes } from "../dados/lembretes";
 import { listarRemedios } from "../dados/remedios";
 import { agendadosAgora, agendarHorario, cancelarTudo } from "./alarme";
+import { reagendarLembretes } from "./lembretes";
 
 /**
  * Reconstrói TODOS os alarmes a partir do banco.
@@ -33,7 +35,6 @@ export async function reconciliarAlarmes(
       const ids = await agendarHorario(
         {
           remedioId: r.id,
-          horarioId: h.id,
           nome: r.nome,
           quantidade: r.quantidade,
           observacao: r.observacao,
@@ -53,6 +54,14 @@ export async function reconciliarAlarmes(
       );
     }
   }
+
+  // Os lembretes vêm depois dos alarmes principais, em duas etapas: primeiro a
+  // decisão ("estas doses merecem uma repetição"), depois o agendamento de
+  // tudo que está na tabela e ainda vale — inclusive um adiamento que ela
+  // pediu antes desta reconciliação e que o `cancelarTudo` lá em cima acabou
+  // de derrubar.
+  await planejarRepeticoes(bd, hoje);
+  await reagendarLembretes(bd, hoje);
 
   return agendadosAgora();
 }

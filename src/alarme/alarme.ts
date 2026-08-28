@@ -30,6 +30,18 @@ import { textoDaQuantidade } from "../dominio/doses";
 const CANAL = "remedios";
 
 /**
+ * A categoria é o que faz os botões aparecerem dentro da notificação.
+ *
+ * Sem `-` nem `:` no identificador: o expo-notifications avisa que categorias
+ * com esses caracteres podem simplesmente não funcionar.
+ */
+export const CATEGORIA = "doseRemedio";
+
+/** Identificadores das ações. Chegam de volta em `response.actionIdentifier`. */
+export const ACAO_TOMEI = "tomei";
+export const ACAO_ADIAR = "adiar";
+
+/**
  * O navegador não agenda alarme do Android. Rodar no navegador serve para
  * conferir a APARÊNCIA das telas rapidamente, e o app precisa degradar em vez
  * de estourar — mas isso NÃO é um ambiente de teste do alarme. O alarme só se
@@ -76,6 +88,27 @@ export async function prepararAlarme(): Promise<boolean> {
     });
   }
 
+  // Os botões da notificação. Registrar a categoria é obrigatório ANTES de
+  // agendar qualquer notificação que a referencie — uma notificação que aponta
+  // para uma categoria inexistente aparece sem botão nenhum, calada.
+  //
+  // `opensAppToForeground: false` nos dois: o ponto do botão é ela resolver na
+  // tela bloqueada, sem esperar o app abrir. O preço está documentado em
+  // `acoes.ts` — com o app morto, o toque é tratado por uma tarefa de fundo, e
+  // não pelo listener da tela.
+  await Notifications.setNotificationCategoryAsync(CATEGORIA, [
+    {
+      identifier: ACAO_TOMEI,
+      buttonTitle: "JÁ TOMEI",
+      options: { opensAppToForeground: false },
+    },
+    {
+      identifier: ACAO_ADIAR,
+      buttonTitle: "LEMBRAR EM 15 MIN",
+      options: { opensAppToForeground: false },
+    },
+  ]);
+
   const { status } = await Notifications.getPermissionsAsync();
   if (status === "granted") return true;
 
@@ -86,7 +119,6 @@ export async function prepararAlarme(): Promise<boolean> {
 /** O que o alarme precisa saber para se descrever. */
 export type AlarmeDeRemedio = {
   remedioId: number;
-  horarioId: number;
   nome: string;
   quantidade: number;
   observacao: string | null;
@@ -96,20 +128,90 @@ export type AlarmeDeRemedio = {
   fimEm: string | null;
 };
 
-function conteudo(a: AlarmeDeRemedio): Notifications.NotificationContentInput {
-  const partes = [a.nome, textoDaQuantidade(a.quantidade)];
-  if (a.observacao) partes.push(a.observacao);
+/**
+ * O que viaja dentro da notificação e volta quando ela toca um botão.
+ *
+ * `minutosDoDia` e não `doseId` no alarme diário: o gatilho diário é agendado
+ * uma vez e toca por meses, enquanto a dose é uma linha nova a cada dia. O
+ * horário é o que não muda — quem descobre a dose do dia é `doseDoAlarme`.
+ *
+ * Os lembretes (repetição e adiamento) são de um dia só, então esses já sabem
+ * o `doseId` e o carregam pronto.
+ */
+export type DadosDoAlarme = {
+  remedioId: number;
+  minutosDoDia: number;
+  doseId?: number;
+};
+
+export function conteudoDoAlarme(o: {
+  titulo: string;
+  nome: string;
+  quantidade: number;
+  observacao: string | null;
+  dados: DadosDoAlarme;
+}): Notifications.NotificationContentInput {
+  const partes = [o.nome, textoDaQuantidade(o.quantidade)];
+  if (o.observacao) partes.push(o.observacao);
 
   return {
-    title: "Hora do remédio",
+    title: o.titulo,
     // Nome primeiro: é o que ela precisa ler na tela bloqueada, sem
     // desbloquear e sem óculos.
     body: partes.join(" · "),
     sound: "default",
     priority: Notifications.AndroidNotificationPriority.MAX,
     vibrate: [0, 300, 150, 300],
-    data: { remedioId: a.remedioId, horarioId: a.horarioId },
+    categoryIdentifier: CATEGORIA,
+    data: { ...o.dados },
   };
+}
+
+function conteudo(a: AlarmeDeRemedio): Notifications.NotificationContentInput {
+  return conteudoDoAlarme({
+    titulo: "Hora do remédio",
+    nome: a.nome,
+    quantidade: a.quantidade,
+    observacao: a.observacao,
+    dados: { remedioId: a.remedioId, minutosDoDia: a.minutosDoDia },
+  });
+}
+
+/**
+ * Agenda uma notificação única para um instante. É o que os lembretes usam.
+ *
+ * Devolve `null` se a hora já passou — agendar no passado faz o Android
+ * disparar na hora, e um lembrete que toca imediatamente é pior que nenhum.
+ */
+export async function agendarUmaVez(
+  conteudoDela: Notifications.NotificationContentInput,
+  quando: Date,
+): Promise<string | null> {
+  if (!TEM_ALARME) return null;
+  if (quando.getTime() <= Date.now()) return null;
+
+  return Notifications.scheduleNotificationAsync({
+    content: conteudoDela,
+    trigger: {
+      type: Notifications.SchedulableTriggerInputTypes.DATE,
+      channelId: CANAL,
+      date: quando,
+    },
+  });
+}
+
+/**
+ * Tira da barra de notificação uma notificação já mostrada.
+ *
+ * Necessário porque botão de ação não fecha a notificação sozinho: sem isto,
+ * ela toca "JÁ TOMEI" e o aviso continua ali, dando a entender que não
+ * funcionou.
+ */
+export async function dispensar(notificacaoId: string): Promise<void> {
+  if (!TEM_ALARME) return;
+  await Notifications.dismissNotificationAsync(notificacaoId).catch(() => {
+    // Já saiu da barra. Não é erro.
+  });
 }
 
 /**
