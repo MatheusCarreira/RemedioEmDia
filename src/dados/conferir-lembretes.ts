@@ -32,6 +32,7 @@ import {
   planejarRepeticoesDoDia,
   DIAS_COM_REPETICAO,
   MINUTOS_PARA_REPETIR,
+  TETO_DE_LEMBRETES,
 } from "./lembretes";
 import {
   definirAtivo,
@@ -302,9 +303,10 @@ async function principal() {
   {
     const { bd } = await bancoDeTeste();
     const quantas = await planejarRepeticoes(bd, as(7));
+    const esperadas = DIAS_COM_REPETICAO * 2;
     conferir(
-      "às 07:00 prepara hoje e amanhã: quatro repetições",
-      quantas === 4,
+      `às 07:00 prepara ${DIAS_COM_REPETICAO} dias: ${esperadas} repetições`,
+      quantas === esperadas,
       `planejadas=${quantas}`,
     );
 
@@ -326,17 +328,54 @@ async function principal() {
     const amanha = new Date(HOJE);
     amanha.setDate(amanha.getDate() + 1);
     const lembretes = await lembretesAindaValidos(bd, as(23, 30));
-    const horas = lembretes.map((l) =>
-      l.lembrete.previstoPara.toTimeString().slice(0, 5),
-    );
     conferir(
-      "às 23:30 planeja só as de amanhã",
-      quantas === 2 && horas.join(" ") === "08:30 20:30",
-      `${quantas} planejadas: ${horas.join(" ")}`,
+      "às 23:30 as de hoje já passaram e só as futuras entram",
+      quantas === (DIAS_COM_REPETICAO - 1) * 2,
+      `planejadas=${quantas}`,
     );
     conferir(
       "e a primeira delas é a da manhã seguinte",
-      lembretes[0]?.dose.previstoPara.getDate() === amanha.getDate(),
+      lembretes[0]?.dose.previstoPara.getDate() === amanha.getDate() &&
+        lembretes[0]?.lembrete.previstoPara.toTimeString().slice(0, 5) ===
+          "08:30",
+      lembretes[0]?.lembrete.previstoPara.toTimeString().slice(0, 5),
+    );
+  }
+
+  {
+    // Muitos remédios com muitos horários: o teto tem que segurar a fila.
+    const bd = abrirEmMemoria();
+    await migrar(bd);
+    for (let i = 0; i < 20; i += 1) {
+      await salvarRemedio(
+        bd,
+        {
+          nome: `Remédio ${i}`,
+          quantidade: 1,
+          observacao: null,
+          fotoUri: null,
+          ativo: true,
+          inicioEm: "2026-08-01",
+          fimEm: null,
+          estoqueComprimidos: null,
+          comprimidosPorCaixa: null,
+          horarios: [7 * 60, 12 * 60, 18 * 60, 22 * 60],
+        },
+        HOJE,
+      );
+    }
+    const planejadas = await planejarRepeticoes(bd, as(6));
+    const aAgendar = await lembretesAindaValidos(bd, as(6));
+    conferir(
+      `${planejadas} lembretes planejados, mas só ${TETO_DE_LEMBRETES} vão para o Android`,
+      planejadas > TETO_DE_LEMBRETES && aAgendar.length === TETO_DE_LEMBRETES,
+      `planejados=${planejadas} agendados=${aAgendar.length}`,
+    );
+    conferir(
+      "e os que sobrevivem ao corte são os mais próximos",
+      aAgendar[0].lembrete.previstoPara.getTime() <
+        aAgendar[aAgendar.length - 1].lembrete.previstoPara.getTime() &&
+        aAgendar[0].lembrete.previstoPara.getDate() === HOJE.getDate(),
     );
   }
 

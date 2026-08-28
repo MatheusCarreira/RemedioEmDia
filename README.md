@@ -43,14 +43,19 @@ caso ensina a ignorar a notificação, que é o único jeito de este aplicativo
 falhar de verdade. Se ela pedir *LEMBRAR EM 15 MIN*, o lembrete automático é
 cancelado: ela acabou de dizer quando quer ser avisada.
 
-**A repetição é preparada com dois dias de antecedência.** Diferente do alarme
+**A repetição é preparada com uma semana de antecedência.** Diferente do alarme
 principal, que é um gatilho diário do Android e toca sozinho para sempre, a
 repetição precisa ser criada por alguém — ela só deve existir enquanto a dose
 não foi marcada. Quem cria é o aplicativo, ao abrir, e a tarefa de fundo, a cada
-botão de notificação atendido. Preparando dois dias por vez, um dia inteiro sem
-tocar em nada não desliga a repetição. Dois dias inteiros sem tocar em nada
-desligam: o alarme principal continua, a repetição para, e volta assim que ela
-abrir o aplicativo ou tocar um botão.
+botão de notificação atendido. Uma semana de antecedência cobre justamente a
+situação em que ela mais precisa e menos vai abrir o aplicativo: a semana em que
+adoece, viaja ou se desorganiza. Passada uma semana inteira sem abrir o
+aplicativo e sem tocar em nenhum botão, o alarme principal continua tocando e só
+a repetição para — e ela volta no primeiro toque.
+
+O número de notificações agendadas tem teto (120, as mais próximas primeiro).
+Com muitos remédios de muitos horários a fila cresceria rápido, e o Android não
+promete atender uma fila desse tamanho.
 
 **Nada de checagem de interação medicamentosa.** Isso é ato médico, depende de
 base licenciada.

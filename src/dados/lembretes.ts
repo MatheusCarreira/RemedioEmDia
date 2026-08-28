@@ -210,6 +210,18 @@ export async function apagarLembretesDaDose(
 }
 
 /**
+ * Teto de lembretes agendados ao mesmo tempo.
+ *
+ * Uma semana de horizonte com muitos remédios multiplica rápido: dez remédios
+ * de quatro horários dariam 280 notificações agendadas. O Android não promete
+ * atender uma fila desse tamanho, e nem precisa — os lembretes vêm ordenados do
+ * mais próximo para o mais distante, então cortar no fim descarta os últimos
+ * dias, que são os que mais chance têm de serem replanejados antes de chegar a
+ * vez deles.
+ */
+export const TETO_DE_LEMBRETES = 120;
+
+/**
  * Os lembretes que ainda fazem sentido: hora no futuro e dose ainda pendente.
  *
  * É a partir daqui que a reconciliação reconstrói os agendamentos depois de
@@ -248,8 +260,10 @@ export async function lembretesAindaValidos(
        JOIN doses d    ON d.id = l.dose_id
        JOIN remedios r ON r.id = d.remedio_id
       WHERE d.status = 'PENDENTE' AND l.previsto_para > ?
-      ORDER BY l.previsto_para`,
+      ORDER BY l.previsto_para
+      LIMIT ?`,
     agora.toISOString(),
+    TETO_DE_LEMBRETES,
   );
 
   return linhas.map((l) => ({
@@ -308,18 +322,20 @@ export async function planejarRepeticoesDoDia(
 /**
  * Por quantos dias à frente as repetições são preparadas.
  *
- * DOIS, e não um, por um motivo concreto: a repetição de uma dose só existe se
- * alguma coisa tiver rodado antes dela. Se o horizonte fosse só "hoje", a
- * PRIMEIRA dose de cada dia nunca teria repetição — nada teria rodado ainda
- * naquele dia — e justamente a dose da manhã é a mais fácil de esquecer.
+ * Existe porque a repetição de uma dose só acontece se alguma coisa a tiver
+ * criado ANTES — diferente do alarme principal, que é um gatilho diário do
+ * Android e toca sozinho para sempre. Se o horizonte fosse só "hoje", a
+ * PRIMEIRA dose de cada dia nunca teria repetição, porque nada teria rodado
+ * ainda naquele dia, e justamente a dose da manhã é a mais fácil de esquecer.
  *
- * Preparando amanhã junto, um dia inteiro sem tocar no aplicativo não desliga a
- * repetição. Dois dias inteiros sem tocar em nada desligam: as repetições
- * param, e só o alarme principal continua tocando. É uma degradação, não uma
- * falha — e o horizonte volta a andar assim que ela abrir o aplicativo ou tocar
- * um botão da notificação.
+ * UMA SEMANA, e não dois dias. Dois dias já cobriam o caso comum, mas deixavam
+ * a repetição morrer exatamente na situação em que ela é mais necessária: a
+ * semana em que ela adoece, viaja ou simplesmente se desorganiza, que é quando
+ * o remédio é mais esquecido e quando ela menos vai abrir o aplicativo. O custo
+ * é uma notificação agendada por dose no período, com teto em
+ * `TETO_DE_LEMBRETES` — barato perto de esquecer um anti-hipertensivo.
  */
-export const DIAS_COM_REPETICAO = 2;
+export const DIAS_COM_REPETICAO = 7;
 
 /**
  * Prepara as doses e as repetições do horizonte inteiro.
