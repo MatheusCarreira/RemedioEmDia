@@ -158,6 +158,9 @@ aplicativo morto. Isso só existe no aparelho e só se sabe testando lá.
 
 ## Como gerar o APK
 
+> Passo a passo completo, para quem nunca fez aplicativo Android antes:
+> **[INSTALAR.md](INSTALAR.md)**. O resumo está aqui embaixo.
+
 O aplicativo pronto é offline por construção: o `expo-updates` não está
 instalado, então o JavaScript vai dentro do APK e nada é buscado na rede ao
 abrir. Internet só é preciso para **gerar** o arquivo.
