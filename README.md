@@ -156,6 +156,38 @@ O que esses scripts **não** conferem é a metade que fala com o Android: se a
 notificação toca, se o botão aparece, se a tarefa de fundo acorda com o
 aplicativo morto. Isso só existe no aparelho e só se sabe testando lá.
 
+## Como gerar o APK
+
+O aplicativo pronto é offline por construção: o `expo-updates` não está
+instalado, então o JavaScript vai dentro do APK e nada é buscado na rede ao
+abrir. Internet só é preciso para **gerar** o arquivo.
+
+O build sai na nuvem, pelo EAS — assim não é preciso ter JDK nem o SDK do
+Android na máquina:
+
+```bash
+npm i -g eas-cli
+eas login
+eas build -p android --profile aparelho
+```
+
+O perfil `aparelho` no `eas.json` produz **`.apk`**. O padrão do EAS é `.aab`,
+que serve para a Play Store e **não instala** direto no celular. O `versionCode`
+é controlado e incrementado pelo próprio EAS a cada build, por isso ele não
+aparece no `app.json`.
+
+Não é preciso `google-services.json` nem nada do Firebase: isso só existiria
+para push remoto, e este aplicativo não usa.
+
+**Guarde a conta do EAS.** No primeiro build ele gera a chave de assinatura e a
+mantém lá. Um APK assinado com chave diferente o Android se recusa a instalar
+por cima — ela teria que desinstalar o antigo, e desinstalar apaga o banco:
+cadastro, histórico e estoque.
+
+Os ícones saem de `scripts/gerar-icones.py` (precisa de Pillow). Não fazem parte
+do build; é um gerador de uma vez só, guardado para os desenhos poderem ser
+refeitos se a cor mudar.
+
 ## O que ainda falta
 
 - Gerar o APK e instalar no celular dela.
