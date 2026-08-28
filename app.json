@@ -1,0 +1,46 @@
+{
+  "expo": {
+    "name": "Remédio em Dia",
+    "slug": "remedio-em-dia",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "primaryColor": "#b45309",
+    "userInterfaceStyle": "light",
+    "splash": {
+      "image": "./assets/splash-icon.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#f5f5f4"
+    },
+    "android": {
+      "package": "br.com.remedioemdia",
+      "versionCode": 1,
+      "adaptiveIcon": {
+        "backgroundColor": "#b45309",
+        "foregroundImage": "./assets/android-icon-foreground.png",
+        "monochromeImage": "./assets/android-icon-monochrome.png"
+      },
+      "predictiveBackGestureEnabled": false,
+      "edgeToEdgeEnabled": true,
+      "permissions": [
+        "android.permission.SCHEDULE_EXACT_ALARM",
+        "android.permission.USE_EXACT_ALARM",
+        "android.permission.POST_NOTIFICATIONS",
+        "android.permission.RECEIVE_BOOT_COMPLETED",
+        "android.permission.VIBRATE"
+      ]
+    },
+    "plugins": [
+      "expo-sqlite",
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/android-icon-monochrome.png",
+          "color": "#b45309"
+        }
+      ],
+      "@react-native-community/datetimepicker",
+      "expo-image"
+    ]
+  }
+}
