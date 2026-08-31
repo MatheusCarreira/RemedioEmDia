@@ -17,9 +17,17 @@ export type Dose = {
   fotoUri?: string;
 };
 
-export type EstadoDose = "espera" | "agora" | "passou" | "feito";
+export type EstadoDose = "espera" | "chegando" | "agora" | "passou" | "feito";
 
-/** Minutos antes do horário em que o cartão já acende como "está na hora". */
+/**
+ * Minutos antes do horário em que o cartão já acende, para ela ver a dose
+ * chegando e poder marcar um pouco antes.
+ *
+ * Acender NÃO é dizer que chegou a hora. O cartão aceso antes do horário é o
+ * estado "chegando", com rótulo próprio: escrever "ESTÁ NA HORA" às 08:28
+ * sobre uma dose das 08:33 é o aplicativo afirmando uma coisa falsa, e ainda
+ * discordando da própria notificação, que só toca às 08:33.
+ */
 const JANELA_ANTES = 15;
 
 /**
@@ -48,6 +56,7 @@ export function estadoDaDose(dose: Dose, agora: Date): EstadoDose {
   const t = agora.getTime();
 
   if (t < abre) return "espera";
+  if (t < previsto) return "chegando";
   if (t <= fecha) return "agora";
   return "passou";
 }

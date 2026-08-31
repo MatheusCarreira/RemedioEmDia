@@ -34,7 +34,8 @@
     "tipos": "tsc --noEmit",
     "estoque:conferir": "node --import ./scripts/registrar-ts.mjs --no-warnings src/dominio/conferir-estoque.ts",
     "lembretes:conferir": "node --import ./scripts/registrar-ts.mjs --no-warnings src/dados/conferir-lembretes.ts",
-    "conferir": "npm run tipos && npm run estoque:conferir && npm run lembretes:conferir"
+    "conferir": "npm run tipos && npm run doses:conferir && npm run estoque:conferir && npm run lembretes:conferir",
+    "doses:conferir": "node --import ./scripts/registrar-ts.mjs --no-warnings src/dominio/conferir-doses.ts"
   },
   "private": true
 }

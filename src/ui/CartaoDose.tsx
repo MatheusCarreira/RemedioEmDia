@@ -57,19 +57,26 @@ export function CartaoDose({
   }
 
   const agora = estado === "agora";
+  const chegando = estado === "chegando";
   const passou = estado === "passou";
+
+  // Aceso: âmbar, nome maior e botão grande. Vale para os dois estados em que
+  // ela pode agir — o que já chegou e o que está a minutos de chegar.
+  const aceso = agora || chegando;
 
   // "Passou da hora" NÃO usa âmbar e NÃO ganha botão grande. Âmbar significa
   // "aja agora" neste app; pintar de âmbar uma dose de quatro horas atrás
   // empurraria ela a tomar remédio da manhã à noite. O cartão relata o
   // atraso e para por aí — se aquele remédio ainda pode ser tomado é decisão
   // dela, não de um aplicativo.
-  const rotulo = agora
-    ? "ESTÁ NA HORA"
-    : passou
-      ? "PASSOU DA HORA"
-      : "Mais tarde";
-  const corDoRotulo = agora
+  const rotulo = chegando
+    ? "DAQUI A POUCO"
+    : agora
+      ? "ESTÁ NA HORA"
+      : passou
+        ? "PASSOU DA HORA"
+        : "Mais tarde";
+  const corDoRotulo = aceso
     ? cores.agora
     : passou
       ? cores.espera
@@ -79,13 +86,13 @@ export function CartaoDose({
     <View
       style={[
         e.cartao,
-        agora ? e.cartaoAgora : passou ? e.cartaoPassou : e.cartaoEspera,
+        aceso ? e.cartaoAgora : passou ? e.cartaoPassou : e.cartaoEspera,
       ]}
     >
       {/* `flexWrap` para o rótulo descer inteiro numa tela estreita, em vez de
           ser cortado — foi exatamente o defeito que apareceu na web a 360px. */}
       <View style={e.linhaHora}>
-        <Text style={[e.hora, { color: agora ? cores.tinta : cores.tintaFraca }]}>
+        <Text style={[e.hora, { color: aceso ? cores.tinta : cores.tintaFraca }]}>
           {hora}
         </Text>
         <View style={e.rotulo}>
@@ -112,7 +119,7 @@ export function CartaoDose({
         />
       ) : null}
 
-      <Text style={[e.nome, { fontSize: agora ? texto.maior : texto.grande }]}>
+      <Text style={[e.nome, { fontSize: aceso ? texto.maior : texto.grande }]}>
         {dose.remedio}
       </Text>
 
@@ -125,7 +132,7 @@ export function CartaoDose({
         <Text style={e.observacao}>{dose.observacao}</Text>
       ) : null}
 
-      {agora ? (
+      {aceso ? (
         <Pressable
           onPress={() => onTomar(dose.id)}
           accessibilityRole="button"
