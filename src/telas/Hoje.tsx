@@ -1,5 +1,5 @@
 import type { SQLiteDatabase } from "expo-sqlite";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import MaterialCommunityIcons from "@expo/vector-icons/MaterialCommunityIcons";
 import {
   ActivityIndicator,
@@ -13,22 +13,12 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { tomarDose } from "../alarme/acoes";
-import { reconciliarAlarmes } from "../alarme/reconciliar";
-import { marcarExemploInicial, semearExemploSeVazio } from "../dados/exemplo";
-import {
-  dosesDeHoje,
-  gerarDosesDoDia,
-  remediosAcabando,
-  reporCaixa,
-} from "../dados/remedios";
+import { dosesDeHoje, remediosAcabando, reporCaixa } from "../dados/remedios";
 import { dataPorExtenso, estadoDaDose, type Dose } from "../dominio/doses";
 import type { RemedioAcabando } from "../dominio/estoque";
 import { AvisoEstoque } from "../ui/AvisoEstoque";
 import { CartaoDose } from "../ui/CartaoDose";
 import { cores, espaco, raio, texto } from "../ui/tokens";
-
-/** A chave que decide se o dia precisa ser preparado de novo. */
-const chaveDoDia = (dia: string, versao: number) => `${dia}#${versao}`;
 
 /**
  * A tela dela. É a que ela vê no dia a dia.
@@ -41,17 +31,19 @@ const chaveDoDia = (dia: string, versao: number) => `${dia}#${versao}`;
 export function Hoje({
   bd,
   aoAbrirRemedios,
-  versao,
+  preparo,
   sinal,
 }: {
   bd: SQLiteDatabase;
   aoAbrirRemedios: () => void;
   /**
-   * Muda quando o cadastro é alterado. Serve para forçar a regeração das doses
-   * e o reagendamento dos alarmes ao voltar do formulário — sem isso, um
-   * remédio recém-cadastrado só apareceria no dia seguinte.
+   * Sobe a cada vez que o `App` termina de preparar o dia — gerar as doses e
+   * remontar os alarmes. Esta tela não prepara nada: ela lê o que já está
+   * pronto. Preparar aqui era um defeito, porque quem cadastrava um remédio e
+   * fechava o app pela tela de lista nunca passava por esta tela, e saía sem
+   * alarme nenhum agendado.
    */
-  versao: number;
+  preparo: number;
   /**
    * Muda quando um botão da notificação foi atendido com o app aberto. Só
    * relê; não refaz o dia. Sem isso ela marcaria "já tomei" na notificação e
@@ -64,25 +56,8 @@ export function Hoje({
   const [doses, setDoses] = useState<Dose[]>([]);
   const [acabando, setAcabando] = useState<RemedioAcabando[]>([]);
 
-  // O dia que já foi preparado (doses geradas, alarmes reconciliados). Guardado
-  // numa ref, não em estado: mudar isso não deve provocar render.
-  const diaPreparado = useRef<string | null>(null);
-
   const recarregar = useCallback(async () => {
     const momento = new Date();
-    const dia = momento.toDateString();
-
-    // Preparar o dia é caro (gera doses e reconstrói todos os alarmes), então
-    // acontece uma vez por dia — mas a checagem é por DATA, não por "já rodou".
-    // É isso que faz o app se acertar sozinho quando ela o abre depois da
-    // meia-noite ou depois de dias sem usar.
-    if (diaPreparado.current !== chaveDoDia(dia, versao)) {
-      const semeou = await semearExemploSeVazio(bd, momento);
-      await gerarDosesDoDia(bd, momento);
-      if (semeou) await marcarExemploInicial(bd, momento);
-      await reconciliarAlarmes(bd, momento);
-      diaPreparado.current = chaveDoDia(dia, versao);
-    }
 
     const [d, a] = await Promise.all([
       dosesDeHoje(bd, momento),
@@ -92,7 +67,7 @@ export function Hoje({
     setAcabando(a);
     setAgora(momento);
     setCarregando(false);
-  }, [bd, versao]);
+  }, [bd]);
 
   useEffect(() => {
     void recarregar();
@@ -122,6 +97,11 @@ export function Hoje({
     if (sinal > 0) void recarregar();
   }, [sinal, recarregar]);
 
+  // O `App` acabou de preparar o dia: as doses de hoje podem ter nascido agora.
+  useEffect(() => {
+    if (preparo > 0) void recarregar();
+  }, [preparo, recarregar]);
+
   async function aoTomar(id: string) {
     // Otimista: a tela responde no toque. Um botão que fica meio segundo sem
     // reagir faz ela apertar de novo — e o toque duplo é justamente o que a
@@ -147,7 +127,7 @@ export function Hoje({
     setAcabando(await remediosAcabando(bd));
   }
 
-  if (carregando) {
+  if (carregando || preparo === 0) {
     return (
       <SafeAreaView style={e.tela}>
         <View style={e.centro}>

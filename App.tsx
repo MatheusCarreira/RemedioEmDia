@@ -1,11 +1,12 @@
 import * as Notifications from "expo-notifications";
 import type { SQLiteDatabase } from "expo-sqlite";
 import { StatusBar } from "expo-status-bar";
-import { useEffect, useState } from "react";
-import { Platform, StyleSheet, Text, View } from "react-native";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { AppState, Platform, StyleSheet, Text, View } from "react-native";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import { tratarResposta } from "./src/alarme/acoes";
 import { prepararAlarme } from "./src/alarme/alarme";
+import { prepararODia } from "./src/alarme/preparoDoDia";
 import { registrarTarefaDeFundo } from "./src/alarme/tarefaDeFundo";
 import { abrirBanco } from "./src/dados/banco";
 import { FormularioRemedio } from "./src/telas/FormularioRemedio";
@@ -37,10 +38,12 @@ export default function App() {
   const [semPermissao, setSemPermissao] = useState(false);
   const [tela, setTela] = useState<Tela>({ nome: "hoje" });
 
-  // Sobe a cada mudança no cadastro. A tela "Hoje" observa isto para regerar
-  // as doses e reagendar os alarmes — sem isso, um remédio recém-cadastrado
-  // só apareceria no dia seguinte.
+  // Sobe a cada mudança no cadastro. É o que obriga o dia a ser preparado de
+  // novo — sem isso, um remédio recém-cadastrado só apareceria no dia seguinte.
   const [versaoDados, setVersaoDados] = useState(0);
+
+  // Sobe a cada preparo concluído. A tela "Hoje" observa isto para reler.
+  const [preparo, setPreparo] = useState(0);
 
   // Sobe a cada botão de notificação atendido com o app aberto. Separado de
   // `versaoDados` de propósito: aqui basta reler as doses, enquanto uma
@@ -65,6 +68,51 @@ export default function App() {
       }
     })();
   }, []);
+
+  // O dia que já foi preparado, e a fila que garante um preparo por vez.
+  //
+  // A fila não é zelo excessivo: o efeito abaixo e a volta do segundo plano
+  // podem disparar juntos, e duas reconciliações simultâneas se atropelam —
+  // o `cancelarTudo` da segunda apaga os alarmes que a primeira acabou de
+  // agendar, ou os dois agendam e sobram alarmes em dobro.
+  const diaPreparado = useRef<string | null>(null);
+  const fila = useRef<Promise<void>>(Promise.resolve());
+
+  const prepararSePreciso = useCallback(() => {
+    if (!bd) return;
+
+    const tarefa = async () => {
+      const momento = new Date();
+      // A chave é por DATA, não um "já rodou": é isso que faz o app se
+      // acertar sozinho quando ela o abre depois da meia-noite ou depois de
+      // dias sem usar. A versão entra na chave para o cadastro também contar.
+      const chave = `${momento.toDateString()}#${versaoDados}`;
+      if (diaPreparado.current === chave) return;
+
+      await prepararODia(bd, momento);
+      diaPreparado.current = chave;
+      setPreparo((n) => n + 1);
+    };
+
+    fila.current = fila.current.then(tarefa, tarefa).catch((e) => {
+      // Um dia que não pôde ser preparado é um dia sem alarme confiável. Vale
+      // mais parar e dizer do que deixar a tela bonita mentindo que está tudo
+      // agendado.
+      setErro(e instanceof Error ? e.message : String(e));
+    });
+  }, [bd, versaoDados]);
+
+  useEffect(() => {
+    prepararSePreciso();
+  }, [prepararSePreciso]);
+
+  // Voltar do segundo plano pode ter atravessado a meia-noite.
+  useEffect(() => {
+    const sub = AppState.addEventListener("change", (estado) => {
+      if (estado === "active") prepararSePreciso();
+    });
+    return () => sub.remove();
+  }, [prepararSePreciso]);
 
   /**
    * O caminho do botão da notificação COM o app vivo.
@@ -128,7 +176,7 @@ export default function App() {
       {tela.nome === "hoje" ? (
         <Hoje
           bd={bd}
-          versao={versaoDados}
+          preparo={preparo}
           sinal={respostasTratadas}
           aoAbrirRemedios={() => setTela({ nome: "remedios" })}
         />
